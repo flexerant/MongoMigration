@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace MongoMigration
+namespace Flexerant.MongoMigration
 {
     public class MigrationException : Exception
     {

@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace MongoMigration
+namespace Flexerant.MongoMigration
 {
     public static class StartupExtensions
     {

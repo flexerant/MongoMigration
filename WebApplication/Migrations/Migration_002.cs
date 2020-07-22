@@ -1,6 +1,6 @@
-﻿using MongoDB.Bson;
+﻿using Flexerant.MongoMigration;
+using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoMigration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
