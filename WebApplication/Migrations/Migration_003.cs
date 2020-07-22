@@ -1,6 +1,6 @@
-﻿using MongoDB.Bson;
+﻿using Flexerant.MongoMigration;
+using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoMigration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +11,14 @@ namespace WebApplication.Data
     [Migration(3)]
     public class Migration_003 : Migration
     {
-        public override string Description => "Change class_id type to string";
+        private readonly IHelloService _helloService;
+
+        public Migration_003(IHelloService helloService)
+        {
+            _helloService = helloService;
+        }
+
+        public override string Description => _helloService.Greeting;
 
         public override void Up(IMongoDatabase db)
         {

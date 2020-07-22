@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
+using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -9,17 +11,17 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace MongoMigration
+namespace Flexerant.MongoMigration
 {
     class MigrationRunner : IMigrationRunner
     {
         private readonly MigrationOptions _migrationOptions;
-        //private readonly IMongoDatabase _db;
+        private readonly IServiceProvider _serviceProvider;
 
-        public MigrationRunner(IOptions<MigrationOptions> options)
+        public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options)
         {
             _migrationOptions = options.Value;
-            //_db = db;
+            _serviceProvider = serviceProvider;
         }
 
         private void HandleException(string message)
@@ -41,11 +43,13 @@ namespace MongoMigration
 
         public void Run()
         {
+            //var serviceProvider = _serviceCollection.BuildServiceProvider();
             var database = _migrationOptions.MongoDatabase;
             var collection = database.GetCollection<MigratedItem>("Migrations");
             var filter = Builders<MigratedItem>.Filter.Empty;
             var latestMigration = collection.Find(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
             Dictionary<int, Type> migrations = new Dictionary<int, Type>();
+
 
             foreach (var ass in _migrationOptions.Assemblies)
             {
@@ -87,23 +91,47 @@ namespace MongoMigration
 
                         try
                         {
-                            Migration m = Activator.CreateInstance(type) as Migration;
+                            var constructors = type.GetConstructors();
+
+                            //var hasParameterizedConstructors = constructors.Any(c => c.GetParameters().Count() > 0);
+                            var constructor = constructors.Where(c => c.GetParameters().Count() > 0).FirstOrDefault();
+                            List<object> constructorParameters = new List<object>();
+
+                            if (constructor == null)
+                            {
+                                constructor = constructors.FirstOrDefault();
+                            }
+
+                            foreach (var constructorParameter in constructor.GetParameters())
+                            {
+                                Type instanceType = constructorParameter.ParameterType;
+
+                                var instance = _serviceProvider.GetService(instanceType);
+
+                                if (instance == null) throw new InvalidOperationException($"Unable to resolve service for type {instanceType.FullName} while attempting to activate {type.FullName}.");
+
+                                constructorParameters.Add(instance);
+                            }
+
+                            Migration m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
 
                             m.Up(database);
                             //m.Down(database);
 
-                            collection.InsertOne(new MigratedItem() { 
+                            collection.InsertOne(new MigratedItem()
+                            {
                                 MigrationNumber = migrationNumber,
                                 Description = m.Description,
-                                Type = type.FullName, 
+                                Type = type.FullName,
                                 Assembly = type.Assembly.GetName().Name,
-                                TimeStamp = DateTime.UtcNow });
+                                TimeStamp = DateTime.UtcNow
+                            });
                         }
                         catch (Exception ex)
                         {
                             session.AbortTransaction();
 
-                            this.HandleException( $"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
+                            this.HandleException($"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
                         }
                     }
 

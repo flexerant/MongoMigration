@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Flexerant.MongoMigration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -11,7 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
-using MongoMigration;
 
 namespace WebApplication
 {
@@ -32,6 +32,8 @@ namespace WebApplication
             services.AddSingleton<IMongoDatabase, MongoDatabaseBase>(x => (MongoDatabaseBase)mongoClient.GetDatabase(this.Configuration["MongoDB:Database"]));
 
             services.AddMongoMigrations(options => { });
+
+            services.AddTransient<IHelloService, HelloService>();
 
             services.AddControllers();
         }
