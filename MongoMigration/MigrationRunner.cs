@@ -17,11 +17,28 @@ namespace Flexerant.MongoMigration
     {
         private readonly MigrationOptions _migrationOptions;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<MigrationRunner> _logger;
+        private readonly IMongoDatabase _database;
 
-        public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options)
+        public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options, IMongoDatabase mongoDatabase, ILogger<MigrationRunner> logger)
         {
             _migrationOptions = options.Value;
             _serviceProvider = serviceProvider;
+            _logger = logger;
+
+            if (_migrationOptions.MongoDatabase == null)
+            {
+                _database = mongoDatabase;
+            }
+            else
+            {
+                _database = _migrationOptions.MongoDatabase;
+            }
+
+            if (_database == null)
+            {
+                throw new MigrationException($"The dependency '{typeof(IMongoDatabase).FullName}' could not be found.");
+            }
         }
 
         private void HandleException(string message)
@@ -35,44 +52,36 @@ namespace Flexerant.MongoMigration
             {
                 throw new MigrationException(message, ex);
             }
-            else if (_migrationOptions.Logger != null)
+            else if (_logger != null)
             {
-                _migrationOptions.Logger.LogError(message);
+                _logger.LogError(message);
             }
         }
 
         public void Run()
         {
-            //var serviceProvider = _serviceCollection.BuildServiceProvider();
-            var database = _migrationOptions.MongoDatabase;
-            var collection = database.GetCollection<MigratedItem>("Migrations");
+            var collection = _database.GetCollection<MigratedItem>("Migrations");
             var filter = Builders<MigratedItem>.Filter.Empty;
             var latestMigration = collection.Find(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
             Dictionary<int, Type> migrations = new Dictionary<int, Type>();
-
 
             foreach (var ass in _migrationOptions.Assemblies)
             {
                 foreach (var t in ass.GetTypes())
                 {
-                    MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
-
-                    if (att != null)
+                    if (typeof(Migration).IsAssignableFrom(t))
                     {
-                        if (typeof(Migration).IsAssignableFrom(t))
+                        MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
+
+                        if (att == null) this.HandleException($"The type '{t.FullName}' must be decorated with '{typeof(MigrationAttribute).FullName}'.");
+
+                        if (migrations.ContainsKey(att.MigrationNumber))
                         {
-                            if (migrations.ContainsKey(att.MigrationNumber))
-                            {
-                                this.HandleException($"Migration {att.MigrationNumber} on {t.FullName} has already been registered on {migrations[att.MigrationNumber].FullName}.");
-                            }
-                            else
-                            {
-                                migrations.Add(att.MigrationNumber, t);
-                            }
+                            this.HandleException($"Migration {att.MigrationNumber} on {t.FullName} has already been registered on {migrations[att.MigrationNumber].FullName}.");
                         }
                         else
                         {
-                            this.HandleException($"The type '{t.FullName}' does not inherit from '{typeof(Migration).FullName}'. Migration {att.MigrationNumber} could not be run.");
+                            migrations.Add(att.MigrationNumber, t);
                         }
                     }
                 }
@@ -85,56 +94,105 @@ namespace Flexerant.MongoMigration
 
                 if (migrationNumber > latestMigration)
                 {
-                    using (var session = database.Client.StartSession())
+                    try
                     {
-                        session.StartTransaction();
+                        var constructors = type.GetConstructors();
+                        List<object> constructorParameters = new List<object>();
+                        List<string> constructorErrors = new List<string>();
 
-                        try
+                        //********************************************************************************************
+                        //* Cycle through each constructor and try to find any dependencies. If found, resolve them. *
+                        //********************************************************************************************
+                        foreach (var constructor in constructors.Where(c => c.GetParameters().Count() > 0))
                         {
-                            var constructors = type.GetConstructors();
-
-                            //var hasParameterizedConstructors = constructors.Any(c => c.GetParameters().Count() > 0);
-                            var constructor = constructors.Where(c => c.GetParameters().Count() > 0).FirstOrDefault();
-                            List<object> constructorParameters = new List<object>();
-
-                            if (constructor == null)
-                            {
-                                constructor = constructors.FirstOrDefault();
-                            }
-
                             foreach (var constructorParameter in constructor.GetParameters())
                             {
-                                Type instanceType = constructorParameter.ParameterType;
+                                try
+                                {
+                                    Type instanceType = constructorParameter.ParameterType;
+                                    var instance = _serviceProvider.GetService(instanceType);
 
-                                var instance = _serviceProvider.GetService(instanceType);
+                                    if (instance == null)
+                                    {
+                                        constructorErrors.Add($"Unable to resolve service for type {instanceType.FullName} while attempting to activate {type.FullName}.");
+                                    }
+                                    else
+                                    {
+                                        constructorParameters.Add(instance);
+                                    }
+                                }
+                                catch
+                                {
+                                    constructorParameters.Clear();
+                                }
 
-                                if (instance == null) throw new InvalidOperationException($"Unable to resolve service for type {instanceType.FullName} while attempting to activate {type.FullName}.");
-
-                                constructorParameters.Add(instance);
+                                if (!constructorErrors.Any())
+                                {
+                                    goto LoopEnd; // exit immediately.
+                                }
                             }
 
-                            Migration m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
-
-                            m.Up(database);
-                            //m.Down(database);
-
-                            collection.InsertOne(new MigratedItem()
-                            {
-                                MigrationNumber = migrationNumber,
-                                Description = m.Description,
-                                Type = type.FullName,
-                                Assembly = type.Assembly.GetName().Name,
-                                TimeStamp = DateTime.UtcNow
-                            });
+                            if (constructorParameters.Any()) break;
                         }
-                        catch (Exception ex)
-                        {
-                            session.AbortTransaction();
 
-                            this.HandleException($"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
+                    LoopEnd:
+
+                        Migration m;
+
+                        if (!constructorParameters.Any())
+                        {
+                            m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
+                        }
+                        else
+                        {
+                            m = Activator.CreateInstance(type) as Migration;
+                        }
+
+                        if (_migrationOptions.SupportsTransactions)
+                        {
+                            //***********************************
+                            //* Use transasctions if supported. *
+                            //***********************************
+                            using (var session = _database.Client.StartSession())
+                            {
+                                session.StartTransaction();
+
+                                try
+                                {
+                                    m.Up(_database);
+                                }
+                                catch
+                                {
+                                    session.AbortTransaction();
+                                    throw;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            m.Up(_database);
+                        }
+
+                        MigratedItem migratedItem = new MigratedItem()
+                        {
+                            MigrationNumber = migrationNumber,
+                            Description = m.Description,
+                            Type = type.FullName,
+                            Assembly = type.Assembly.GetName().Name,
+                            TimeStamp = DateTime.UtcNow
+                        };
+
+                        collection.InsertOne(migratedItem);
+
+                        if (_logger != null)
+                        {
+                            _logger.LogInformation("Successfully migrated to {MigrationNumber}.", migrationNumber);
                         }
                     }
-
+                    catch (Exception ex)
+                    {
+                        this.HandleException($"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
+                    }
                 }
             }
         }

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Flexerant.MongoMigration
 {
-    class MigratedItem
+    public class MigratedItem
     {
         [BsonId]
         public int MigrationNumber { get; set; }
