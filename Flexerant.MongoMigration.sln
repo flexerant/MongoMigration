@@ -7,9 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MongoMigration", "MongoMigr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebApplication", "WebApplication\WebApplication.csproj", "{3E2470F2-4E96-4B68-BDC1-A0E61875EE88}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{15A11DC6-D54C-46BF-975B-AF84BFDC6B69}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{15A11DC6-D54C-46BF-975B-AF84BFDC6B69}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestMigration001", "TestMigration001\TestMigration001.csproj", "{6E72998A-60C0-4360-8632-057C926B032C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestMigrations", "TestMigration001\TestMigrations.csproj", "{6E72998A-60C0-4360-8632-057C926B032C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

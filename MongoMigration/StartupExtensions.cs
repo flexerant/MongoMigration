@@ -25,15 +25,11 @@ namespace Flexerant.MongoMigration
 
             services.Configure<MigrationOptions>(opts =>
             {
+                opts.Assemblies.Add(ass);
                 options.Invoke(opts);
-
-                if (!opts.Assemblies.Any())
-                {
-                    opts.Assemblies.Add(ass);
-                }
             });
 
-            services.TryAddSingleton<IMigrationRunner, MigrationRunner>();
+            services.AddSingleton<IMigrationRunner, MigrationRunner>();
         }
 
         public static void UseMongoMigrations(this IApplicationBuilder app)

@@ -139,7 +139,7 @@ namespace Flexerant.MongoMigration
 
                         Migration m;
 
-                        if (!constructorParameters.Any())
+                        if (constructorParameters.Any())
                         {
                             m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
                         }

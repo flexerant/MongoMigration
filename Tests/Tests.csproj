@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MongoMigration\MongoMigration.csproj" />
+    <ProjectReference Include="..\TestMigration001\TestMigrations.csproj" />
   </ItemGroup>
 
 </Project>
