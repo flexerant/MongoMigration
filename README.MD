@@ -1,19 +1,26 @@
 # Flexerant.MongoMigration
 
-Flexerant.MongoMigration is a .NET Core utility for migrating MongoDB databases and schemas and uses the [MongoDB .NET driver](https://mongodb.github.io/mongo-csharp-driver/). Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked, even changes back to previous states. With this library, migrations occur during startup and support dependency injection.
-
-# Installation
-
 [![nuget](https://img.shields.io/nuget/v/Flexerant.MongoMigration?label=nuget)](https://www.nuget.org/packages/Flexerant.MongoMigration/)
+
+Flexerant.MongoMigration is a .NET Core utility for migrating MongoDB databases and schemas, based on the [MongoDB .NET driver](https://mongodb.github.io/mongo-csharp-driver/). Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked. To revert back to a previous state, simply write a migration that undoes the previous one(s). With this library, migrations occur during startup and support dependency injection.
+
+## Motivation
+
+This project was born out of a need to automate MongoDB migrations when deployed. Simplicity and ease of use were key.
+
+## Installation
+
+Intall from nuget.
 
 `PM> Install-Package Flexerant.MongoMigration`
 
-# Setup
+## Setup
+
+First, start by adding `AddMongoMigrations` extension method to the `IServiceCollection` object;
 
 ```csharp
 public class Startup
 {
-    // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
     {
         ...
@@ -25,10 +32,21 @@ public class Startup
 
         ...
     }
+}
 
-    ...
+```
+The `AddMongoMigrations` extension method takes an optional `MigrationOptions` delegate. 
 
-    // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+| Property          | Description |
+| -------------     | ------------- |
+| `Assemblies`      | An optional collection of assemblies containing migrations. By default the calling assembly is added to the collection. |
+| `MongoDatabase`   | An optional database to use for the migrations. By default the injected IMongoDatabase service is used. |
+
+Secondly, add the `UseMongoMigrations` extension method to the `IApplicationBuilder` object.
+
+```csharp
+public class Startup
+{
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
         ...
@@ -41,9 +59,11 @@ public class Startup
 
 ```
 
-# Migrations
+That's it! Migrations will automatically be executed on start up.
 
-Each migration inherits `Flexerant.MongoMigration.Migration`. The migration number is controlled by the `[Migration]` attribute. Successful migrations result a record saved to the database, whereas failures roll-back the failed migration.
+## Usage
+
+Each migration inherits `Flexerant.MongoMigration.Migration`. The migration number is controlled by the `[Migration]` attribute. Successful migrations result a transaction record saved to the database, whereas failures roll-back the failed migration. Dependency injection is supported so dependencies can be accessed as part of the migration process.
 
 ```csharp
 [Migration(1)]
@@ -72,28 +92,8 @@ public class Migration_001 : Migration
 }
 ```
 
-```csharp
-[Migration(2)]
-public class Migration_002 : Migration
-{
-    public override string Description => "Create class";
+The `Migrate` methods provides access to the `IMongoDatabase` object and therefore any operation supported by `IMongoDatabase` is possible.
 
-    public override void Migrate(IMongoDatabase db)
-    {
-        var document = new BsonDocument { { "class_id", 480 },
-            {
-                "schedule",
-                new BsonArray {
-                    new BsonDocument { { "day", "Monday" }, { "start-time", "8:00AM" }, { "duration", 1.5 } },
-                    new BsonDocument { { "day", "Wednesday" }, { "start-time", "9:00AM" }, { "duration", 1.5 } },
-                    new BsonDocument { { "day", "Friday" }, { "start-time", "1:00PM" }, { "duration", 3 } },
-                }
-            }
-        };
+## License
 
-        var classes = db.GetCollection<BsonDocument>("Classes");
-
-        classes.InsertOne(document);
-    }
-}
-```
+![GitHub](https://img.shields.io/github/license/flexerant/MongoMigration)
