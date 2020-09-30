@@ -12,7 +12,7 @@ namespace Tests
     {
         public override string Description => "Create the students collection.";
 
-        public override void Up(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase db)
         {
             var document = new BsonDocument { { "student_id", 10000 },
                 {

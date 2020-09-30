@@ -15,6 +15,6 @@ namespace TestMigrations
             if (testDependency == null) throw new NullReferenceException();
         }
 
-        public override void Up(IMongoDatabase db) { }
+        public override void Migrate(IMongoDatabase db) { }
     }
 }

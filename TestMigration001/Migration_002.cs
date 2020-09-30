@@ -10,7 +10,7 @@ namespace TestMigrations
     {
         public override string Description => "Create class";
 
-        public override void Up(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase db)
         {
             var document = new BsonDocument { { "class_id", 480 },
                 {
@@ -23,9 +23,9 @@ namespace TestMigrations
                 }
             };
 
-            var students = db.GetCollection<BsonDocument>("Classes");
+            var classes = db.GetCollection<BsonDocument>("Classes");
 
-            students.InsertOne(document);
+            classes.InsertOne(document);
         }
     }
 }

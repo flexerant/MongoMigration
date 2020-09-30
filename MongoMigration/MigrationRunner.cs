@@ -107,7 +107,7 @@ namespace Flexerant.MongoMigration
 
                                 try
                                 {
-                                    m.Up(Database);
+                                    m.Migrate(Database);
                                 }
                                 catch
                                 {
@@ -118,7 +118,7 @@ namespace Flexerant.MongoMigration
                         }
                         catch (NotSupportedException)
                         {
-                            m.Up(Database);
+                            m.Migrate(Database);
                         }
                         catch
                         {

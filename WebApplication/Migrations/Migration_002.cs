@@ -13,7 +13,7 @@ namespace WebApplication.Data
     {
         public override string Description => "Rename 'scores' field to 'Scores'.";
 
-        public override void Up(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase db)
         {
             var filter = Builders<BsonDocument>.Filter.Empty;
             var update = Builders<BsonDocument>.Update.Rename(x => x["scores"], "Scores");
