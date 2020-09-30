@@ -14,19 +14,15 @@ namespace Flexerant.MongoMigration
 {
     public static class StartupExtensions
     {
-        public static void AddMongoMigrations(this IServiceCollection services)
-        {
-            services.AddMongoMigrations(options => { });
-        }
-
-        public static void AddMongoMigrations(this IServiceCollection services, Action<MigrationOptions> options)
+        public static void AddMongoMigrations(this IServiceCollection services, Action<MigrationOptions> options = null)
         {
             var ass = Assembly.GetCallingAssembly();
 
             services.Configure<MigrationOptions>(opts =>
             {
                 opts.Assemblies.Add(ass);
-                options.Invoke(opts);
+
+                if (options != null) options.Invoke(opts);
             });
 
             services.AddSingleton<IMigrationRunner, MigrationRunner>();

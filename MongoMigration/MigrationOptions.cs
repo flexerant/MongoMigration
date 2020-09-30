@@ -11,7 +11,5 @@ namespace Flexerant.MongoMigration
     {
         public List<Assembly> Assemblies = new List<Assembly>();
         public IMongoDatabase MongoDatabase { get; set; } = null;
-        public bool ThrowOnException { get; set; } = true;
-        public bool SupportsTransactions { get; set; } = true;
     }
 }

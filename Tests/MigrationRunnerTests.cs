@@ -1,19 +1,14 @@
 using Microsoft.Extensions.Hosting;
-using Mongo2Go;
 using MongoDB.Driver;
 using System;
 using Xunit;
-using Flexerant;
 using Flexerant.MongoMigration;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Generic;
 using MongoDB.Bson;
-using Microsoft.VisualStudio.TestPlatform.Common.Utilities;
 using System.Linq;
+using Moq;
 
 namespace Tests
 {
@@ -32,10 +27,7 @@ namespace Tests
                        .ConfigureServices(services =>
                        {
                            services.AddSingleton(database);
-                           services.AddMongoMigrations(options =>
-                           {
-                               options.SupportsTransactions = false;
-                           });
+                           services.AddMongoMigrations();
                        })
                        .Configure(app =>
                        {
@@ -76,7 +68,6 @@ namespace Tests
                            services.AddMongoMigrations(options =>
                            {
                                options.Assemblies.Add(typeof(TestMigrations.Migration_002).Assembly);
-                               options.SupportsTransactions = false;
                            });
                        })
                        .Configure(app =>
@@ -115,10 +106,7 @@ namespace Tests
                     config.UseTestServer()
                    .ConfigureServices(services =>
                    {
-                       services.AddMongoMigrations(options =>
-                       {
-                           options.SupportsTransactions = false;
-                       });
+                       services.AddMongoMigrations();
                    })
                    .Configure(app =>
                    {
@@ -130,6 +118,38 @@ namespace Tests
                 {
                     using (var host = builder.Start()) { }
                 });
+            }
+        }
+
+        [Fact]
+        public void AlternateIMongoDatabase()
+        {
+            using (var runner = new TestDatabaseRunner())
+            {
+                var iDatabaseMock = new Mock<IMongoDatabase>();
+                var database = runner.Database;
+                var builder = new HostBuilder()
+                    .ConfigureWebHost(config =>
+                    {
+                        config.UseTestServer()
+                       .ConfigureServices(services =>
+                       {
+                           services.AddSingleton(database);
+                           services.AddMongoMigrations(options =>
+                           {
+                               options.MongoDatabase = iDatabaseMock.Object;
+                           });
+                       })
+                       .Configure(app => { });
+                    });
+
+                using (var host = builder.Start())
+                {
+                    var migrationRunner = host.Services.GetService<IMigrationRunner>() as MigrationRunner;
+
+                    Assert.Equal(iDatabaseMock.Object.GetType(), migrationRunner.Database.GetType());
+                    Assert.NotEqual(database.GetType(), migrationRunner.Database.GetType());
+                }
             }
         }
     }

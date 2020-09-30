@@ -1,15 +1,11 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Flexerant.MongoMigration
 {
@@ -18,7 +14,8 @@ namespace Flexerant.MongoMigration
         private readonly MigrationOptions _migrationOptions;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<MigrationRunner> _logger;
-        private readonly IMongoDatabase _database;
+        
+        internal IMongoDatabase Database;
 
         public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options, IMongoDatabase mongoDatabase, ILogger<MigrationRunner> logger)
         {
@@ -28,14 +25,14 @@ namespace Flexerant.MongoMigration
 
             if (_migrationOptions.MongoDatabase == null)
             {
-                _database = mongoDatabase;
+                Database = mongoDatabase;
             }
             else
             {
-                _database = _migrationOptions.MongoDatabase;
+                Database = _migrationOptions.MongoDatabase;
             }
 
-            if (_database == null)
+            if (Database == null)
             {
                 throw new MigrationException($"The dependency '{typeof(IMongoDatabase).FullName}' could not be found.");
             }
@@ -48,19 +45,17 @@ namespace Flexerant.MongoMigration
 
         private void HandleException(string message, Exception ex)
         {
-            if (_migrationOptions.ThrowOnException)
-            {
-                throw new MigrationException(message, ex);
-            }
-            else if (_logger != null)
+            if (_logger != null)
             {
                 _logger.LogError(message);
             }
+
+            throw new MigrationException(message, ex);
         }
 
         public void Run()
         {
-            var collection = _database.GetCollection<MigratedItem>("Migrations");
+            var collection = Database.GetCollection<MigratedItem>("Migrations");
             var filter = Builders<MigratedItem>.Filter.Empty;
             var latestMigration = collection.Find(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
             Dictionary<int, Type> migrations = new Dictionary<int, Type>();
@@ -69,19 +64,22 @@ namespace Flexerant.MongoMigration
             {
                 foreach (var t in ass.GetTypes())
                 {
-                    if (typeof(Migration).IsAssignableFrom(t))
+                    if (t != typeof(Migration))
                     {
-                        MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
-
-                        if (att == null) this.HandleException($"The type '{t.FullName}' must be decorated with '{typeof(MigrationAttribute).FullName}'.");
-
-                        if (migrations.ContainsKey(att.MigrationNumber))
+                        if (typeof(Migration).IsAssignableFrom(t))
                         {
-                            this.HandleException($"Migration {att.MigrationNumber} on {t.FullName} has already been registered on {migrations[att.MigrationNumber].FullName}.");
-                        }
-                        else
-                        {
-                            migrations.Add(att.MigrationNumber, t);
+                            MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
+
+                            if (att == null) this.HandleException($"The type '{t.FullName}' must be decorated with '{typeof(MigrationAttribute).FullName}'.");
+
+                            if (migrations.ContainsKey(att.MigrationNumber))
+                            {
+                                this.HandleException($"Migration {att.MigrationNumber} on {t.FullName} has already been registered on {migrations[att.MigrationNumber].FullName}.");
+                            }
+                            else
+                            {
+                                migrations.Add(att.MigrationNumber, t);
+                            }
                         }
                     }
                 }
@@ -96,70 +94,20 @@ namespace Flexerant.MongoMigration
                 {
                     try
                     {
-                        var constructors = type.GetConstructors();
-                        List<object> constructorParameters = new List<object>();
-                        List<string> constructorErrors = new List<string>();
+                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;
 
-                        //********************************************************************************************
-                        //* Cycle through each constructor and try to find any dependencies. If found, resolve them. *
-                        //********************************************************************************************
-                        foreach (var constructor in constructors.Where(c => c.GetParameters().Count() > 0))
-                        {
-                            foreach (var constructorParameter in constructor.GetParameters())
-                            {
-                                try
-                                {
-                                    Type instanceType = constructorParameter.ParameterType;
-                                    var instance = _serviceProvider.GetService(instanceType);
-
-                                    if (instance == null)
-                                    {
-                                        constructorErrors.Add($"Unable to resolve service for type {instanceType.FullName} while attempting to activate {type.FullName}.");
-                                    }
-                                    else
-                                    {
-                                        constructorParameters.Add(instance);
-                                    }
-                                }
-                                catch
-                                {
-                                    constructorParameters.Clear();
-                                }
-
-                                if (!constructorErrors.Any())
-                                {
-                                    goto LoopEnd; // exit immediately.
-                                }
-                            }
-
-                            if (constructorParameters.Any()) break;
-                        }
-
-                    LoopEnd:
-
-                        Migration m;
-
-                        if (constructorParameters.Any())
-                        {
-                            m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
-                        }
-                        else
-                        {
-                            m = Activator.CreateInstance(type) as Migration;
-                        }
-
-                        if (_migrationOptions.SupportsTransactions)
+                        try
                         {
                             //***********************************
                             //* Use transasctions if supported. *
                             //***********************************
-                            using (var session = _database.Client.StartSession())
+                            using (var session = Database.Client.StartSession())
                             {
                                 session.StartTransaction();
 
                                 try
                                 {
-                                    m.Up(_database);
+                                    m.Up(Database);
                                 }
                                 catch
                                 {
@@ -168,9 +116,13 @@ namespace Flexerant.MongoMigration
                                 }
                             }
                         }
-                        else
+                        catch (NotSupportedException)
                         {
-                            m.Up(_database);
+                            m.Up(Database);
+                        }
+                        catch
+                        {
+                            throw;
                         }
 
                         MigratedItem migratedItem = new MigratedItem()
