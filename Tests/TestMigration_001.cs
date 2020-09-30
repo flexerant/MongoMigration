@@ -3,19 +3,18 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Text;
 
-namespace WebApplication.Data
+namespace Tests
 {
     [Migration(1)]
-    public class Migration_001 : Migration
+    public class TestMigration_001 : Migration
     {
-        public override string Description => "Create student";
+        public override string Description => "Create the students collection.";
 
         public override void Migrate(IMongoDatabase db)
         {
-            var document = new BsonDocument { { "student_id", 10000 }, 
+            var document = new BsonDocument { { "student_id", 10000 },
                 {
                     "scores",
                     new BsonArray {

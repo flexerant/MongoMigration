@@ -1,15 +1,11 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Flexerant.MongoMigration
 {
@@ -17,11 +13,29 @@ namespace Flexerant.MongoMigration
     {
         private readonly MigrationOptions _migrationOptions;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<MigrationRunner> _logger;
+        
+        internal IMongoDatabase Database;
 
-        public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options)
+        public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options, IMongoDatabase mongoDatabase, ILogger<MigrationRunner> logger)
         {
             _migrationOptions = options.Value;
             _serviceProvider = serviceProvider;
+            _logger = logger;
+
+            if (_migrationOptions.MongoDatabase == null)
+            {
+                Database = mongoDatabase;
+            }
+            else
+            {
+                Database = _migrationOptions.MongoDatabase;
+            }
+
+            if (Database == null)
+            {
+                throw new MigrationException($"The dependency '{typeof(IMongoDatabase).FullName}' could not be found.");
+            }
         }
 
         private void HandleException(string message)
@@ -31,36 +45,33 @@ namespace Flexerant.MongoMigration
 
         private void HandleException(string message, Exception ex)
         {
-            if (_migrationOptions.ThrowOnException)
+            if (_logger != null)
             {
-                throw new MigrationException(message, ex);
+                _logger.LogError(message);
             }
-            else if (_migrationOptions.Logger != null)
-            {
-                _migrationOptions.Logger.LogError(message);
-            }
+
+            throw new MigrationException(message, ex);
         }
 
         public void Run()
         {
-            //var serviceProvider = _serviceCollection.BuildServiceProvider();
-            var database = _migrationOptions.MongoDatabase;
-            var collection = database.GetCollection<MigratedItem>("Migrations");
+            var collection = Database.GetCollection<MigratedItem>("Migrations");
             var filter = Builders<MigratedItem>.Filter.Empty;
             var latestMigration = collection.Find(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
             Dictionary<int, Type> migrations = new Dictionary<int, Type>();
-
 
             foreach (var ass in _migrationOptions.Assemblies)
             {
                 foreach (var t in ass.GetTypes())
                 {
-                    MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
-
-                    if (att != null)
+                    if (t != typeof(Migration))
                     {
                         if (typeof(Migration).IsAssignableFrom(t))
                         {
+                            MigrationAttribute att = t.GetCustomAttribute<MigrationAttribute>();
+
+                            if (att == null) this.HandleException($"The type '{t.FullName}' must be decorated with '{typeof(MigrationAttribute).FullName}'.");
+
                             if (migrations.ContainsKey(att.MigrationNumber))
                             {
                                 this.HandleException($"Migration {att.MigrationNumber} on {t.FullName} has already been registered on {migrations[att.MigrationNumber].FullName}.");
@@ -69,10 +80,6 @@ namespace Flexerant.MongoMigration
                             {
                                 migrations.Add(att.MigrationNumber, t);
                             }
-                        }
-                        else
-                        {
-                            this.HandleException($"The type '{t.FullName}' does not inherit from '{typeof(Migration).FullName}'. Migration {att.MigrationNumber} could not be run.");
                         }
                     }
                 }
@@ -85,56 +92,59 @@ namespace Flexerant.MongoMigration
 
                 if (migrationNumber > latestMigration)
                 {
-                    using (var session = database.Client.StartSession())
+                    try
                     {
-                        session.StartTransaction();
+                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;
 
                         try
                         {
-                            var constructors = type.GetConstructors();
-
-                            //var hasParameterizedConstructors = constructors.Any(c => c.GetParameters().Count() > 0);
-                            var constructor = constructors.Where(c => c.GetParameters().Count() > 0).FirstOrDefault();
-                            List<object> constructorParameters = new List<object>();
-
-                            if (constructor == null)
+                            //***********************************
+                            //* Use transasctions if supported. *
+                            //***********************************
+                            using (var session = Database.Client.StartSession())
                             {
-                                constructor = constructors.FirstOrDefault();
+                                session.StartTransaction();
+
+                                try
+                                {
+                                    m.Migrate(Database);
+                                }
+                                catch
+                                {
+                                    session.AbortTransaction();
+                                    throw;
+                                }
                             }
-
-                            foreach (var constructorParameter in constructor.GetParameters())
-                            {
-                                Type instanceType = constructorParameter.ParameterType;
-
-                                var instance = _serviceProvider.GetService(instanceType);
-
-                                if (instance == null) throw new InvalidOperationException($"Unable to resolve service for type {instanceType.FullName} while attempting to activate {type.FullName}.");
-
-                                constructorParameters.Add(instance);
-                            }
-
-                            Migration m = Activator.CreateInstance(type, constructorParameters.ToArray()) as Migration;
-
-                            m.Up(database);
-                            //m.Down(database);
-
-                            collection.InsertOne(new MigratedItem()
-                            {
-                                MigrationNumber = migrationNumber,
-                                Description = m.Description,
-                                Type = type.FullName,
-                                Assembly = type.Assembly.GetName().Name,
-                                TimeStamp = DateTime.UtcNow
-                            });
                         }
-                        catch (Exception ex)
+                        catch (NotSupportedException)
                         {
-                            session.AbortTransaction();
+                            m.Migrate(Database);
+                        }
+                        catch
+                        {
+                            throw;
+                        }
 
-                            this.HandleException($"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
+                        MigratedItem migratedItem = new MigratedItem()
+                        {
+                            MigrationNumber = migrationNumber,
+                            Description = m.Description,
+                            Type = type.FullName,
+                            Assembly = type.Assembly.GetName().Name,
+                            TimeStamp = DateTime.UtcNow
+                        };
+
+                        collection.InsertOne(migratedItem);
+
+                        if (_logger != null)
+                        {
+                            _logger.LogInformation("Successfully migrated to {MigrationNumber}.", migrationNumber);
                         }
                     }
-
+                    catch (Exception ex)
+                    {
+                        this.HandleException($"An error occurred migrating '{type.FullName}' to version {migrationNumber}.", ex);
+                    }
                 }
             }
         }

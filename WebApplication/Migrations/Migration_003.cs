@@ -20,7 +20,7 @@ namespace WebApplication.Data
 
         public override string Description => _helloService.Greeting;
 
-        public override void Up(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase db)
         {
             var filter = Builders<BsonDocument>.Filter.Empty;
             var updateClientIdTemp = Builders<BsonDocument>.Update.Set(x => x["class_id_temp"], string.Empty);

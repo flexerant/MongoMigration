@@ -10,8 +10,6 @@ namespace Flexerant.MongoMigration
     public class MigrationOptions
     {
         public List<Assembly> Assemblies = new List<Assembly>();
-        public ILogger Logger { get; set; }
-        public IMongoDatabase MongoDatabase { get; set; }
-        public bool ThrowOnException { get; set; } = true;
+        public IMongoDatabase MongoDatabase { get; set; } = null;
     }
 }

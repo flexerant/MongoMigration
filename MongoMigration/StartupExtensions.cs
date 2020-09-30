@@ -14,36 +14,18 @@ namespace Flexerant.MongoMigration
 {
     public static class StartupExtensions
     {
-        public static void AddMongoMigrations(this IServiceCollection services, Action<MigrationOptions> options)
+        public static void AddMongoMigrations(this IServiceCollection services, Action<MigrationOptions> options = null)
         {
             var ass = Assembly.GetCallingAssembly();
 
             services.Configure<MigrationOptions>(opts =>
             {
-                options.Invoke(opts);
+                opts.Assemblies.Add(ass);
 
-                if (!opts.Assemblies.Any())
-                {
-                    opts.Assemblies.Add(ass);
-                }
-
-                if (opts.Logger == null)
-                {
-                    opts.Logger = services.BuildServiceProvider().GetService<ILogger>();
-                }
-
-                if (opts.MongoDatabase == null)
-                {
-                    opts.MongoDatabase = services.BuildServiceProvider().GetService<IMongoDatabase>();
-                }
-
-                if (opts.MongoDatabase == null)
-                {
-                    throw new MigrationException($"The dependency '{typeof(IMongoDatabase).FullName}' could not be found.");
-                }
+                if (options != null) options.Invoke(opts);
             });
 
-            services.TryAddSingleton<IMigrationRunner, MigrationRunner>();
+            services.AddSingleton<IMigrationRunner, MigrationRunner>();
         }
 
         public static void UseMongoMigrations(this IApplicationBuilder app)
