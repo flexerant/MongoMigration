@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Flexerant.MongoMigration
 {
@@ -14,7 +16,7 @@ namespace Flexerant.MongoMigration
         private readonly MigrationOptions _migrationOptions;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<MigrationRunner> _logger;
-        
+
         internal IMongoDatabase Database;
 
         public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options, IMongoDatabase mongoDatabase, ILogger<MigrationRunner> logger)
@@ -94,7 +96,7 @@ namespace Flexerant.MongoMigration
                 {
                     try
                     {
-                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;
+                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;                        
 
                         try
                         {
@@ -103,27 +105,25 @@ namespace Flexerant.MongoMigration
                             //***********************************
                             using (var session = Database.Client.StartSession())
                             {
-                                session.StartTransaction();
-
                                 try
-                                {
-                                    m.Migrate(Database);
+                                {                                 
+                                    m.MigrateAsTransaction(this.Database, session);
+
+                                    if (session.IsInTransaction) session.CommitTransaction();                                    
                                 }
                                 catch
                                 {
-                                    session.AbortTransaction();
+                                    if (session.IsInTransaction) session.AbortTransaction();
                                     throw;
                                 }
                             }
-                        }
-                        catch (NotSupportedException)
-                        {
-                            m.Migrate(Database);
                         }
                         catch
                         {
                             throw;
                         }
+
+                        m.Migrate(this.Database);
 
                         MigratedItem migratedItem = new MigratedItem()
                         {

@@ -20,14 +20,21 @@ namespace WebApplication.Data
 
         public override string Description => _helloService.Greeting;
 
-        public override void Migrate(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase database)
+        {
+            // do nothing
+        }
+
+        public override void MigrateAsTransaction(IMongoDatabase db, IClientSessionHandle session)
         {
             var filter = Builders<BsonDocument>.Filter.Empty;
             var updateClientIdTemp = Builders<BsonDocument>.Update.Set(x => x["class_id_temp"], string.Empty);
             var students = db.GetCollection<BsonDocument>("Students");
             var allStudents = students.Find(filter).ToList();
 
-            students.UpdateMany(filter, updateClientIdTemp);
+            session.StartTransaction();
+
+            students.UpdateMany(session, filter, updateClientIdTemp);
 
             List<UpdateOneModel<BsonDocument>> updateAll = new List<UpdateOneModel<BsonDocument>>();
 
@@ -39,7 +46,7 @@ namespace WebApplication.Data
                 updateAll.Add(new UpdateOneModel<BsonDocument>(studentFilter, studentUpdate));
             }
 
-            students.BulkWrite(updateAll);
+            students.BulkWrite(session, updateAll);
             updateAll = new List<UpdateOneModel<BsonDocument>>();
 
             foreach (var student in allStudents)
@@ -50,7 +57,7 @@ namespace WebApplication.Data
                 updateAll.Add(new UpdateOneModel<BsonDocument>(studentFilter, studentUpdate));
             }
 
-            students.BulkWrite(updateAll);
+            students.BulkWrite(session, updateAll);
             updateAll = new List<UpdateOneModel<BsonDocument>>();
 
             foreach (var student in allStudents)

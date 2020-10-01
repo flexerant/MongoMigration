@@ -30,5 +30,7 @@ namespace Tests
 
             students.InsertOne(document);
         }
+
+        public override void MigrateAsTransaction(IMongoDatabase database, IClientSessionHandle session) { }
     }
 }

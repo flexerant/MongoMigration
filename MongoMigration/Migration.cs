@@ -10,7 +10,7 @@ namespace Flexerant.MongoMigration
     {
         public abstract string Description { get; }
         internal MigrationAttribute MigrationAttribute => this.GetType().GetCustomAttribute<MigrationAttribute>();
-
-        public abstract void Migrate(IMongoDatabase db);
+        public abstract void MigrateAsTransaction(IMongoDatabase database, IClientSessionHandle session);
+        public abstract void Migrate(IMongoDatabase database);
     }
 }
