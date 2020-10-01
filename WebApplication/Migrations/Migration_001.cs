@@ -13,9 +13,16 @@ namespace WebApplication.Data
     {
         public override string Description => "Create student";
 
-        public override void Migrate(IMongoDatabase db)
+        public override void Migrate(IMongoDatabase database) { }
+
+        public override void MigrateAsTransaction(IMongoDatabase database, IClientSessionHandle session)
         {
-            var document = new BsonDocument { { "student_id", 10000 }, 
+            database.CreateCollection(session, "Students");
+            var students = database.GetCollection<BsonDocument>("Students");
+          
+            session.StartTransaction();
+
+            var document = new BsonDocument { { "student_id", 10000 },
                 {
                     "scores",
                     new BsonArray {
@@ -27,9 +34,7 @@ namespace WebApplication.Data
                 }, { "class_id", 480 }
             };
 
-            var students = db.GetCollection<BsonDocument>("Students");
-
-            students.InsertOne(document);
+            students.InsertOne(session, document);
         }
     }
 }

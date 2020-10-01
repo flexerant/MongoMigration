@@ -16,5 +16,7 @@ namespace TestMigrations
         }
 
         public override void Migrate(IMongoDatabase db) { }
+
+        public override void MigrateTransaction(IMongoDatabase database, IClientSessionHandle session) { }
     }
 }
