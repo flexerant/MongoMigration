@@ -96,7 +96,9 @@ namespace Flexerant.MongoMigration
                 {
                     try
                     {
-                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;                        
+                        Migration m = ActivatorUtilities.CreateInstance(_serviceProvider, type) as Migration;
+
+                        m.Migrate(this.Database);
 
                         try
                         {
@@ -121,9 +123,7 @@ namespace Flexerant.MongoMigration
                         catch
                         {
                             throw;
-                        }
-
-                        m.Migrate(this.Database);
+                        }                       
 
                         MigratedItem migratedItem = new MigratedItem()
                         {
