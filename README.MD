@@ -2,7 +2,7 @@
 
 [![nuget](https://img.shields.io/nuget/v/Flexerant.MongoMigration?label=nuget)](https://www.nuget.org/packages/Flexerant.MongoMigration/)
 
-Flexerant.MongoMigration is a .NET Core utility for migrating MongoDB databases and schemas, based on the [MongoDB .NET driver](https://mongodb.github.io/mongo-csharp-driver/). Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked. To revert back to a previous state, simply write a migration that undoes the previous one(s). With this library, migrations occur during startup and support dependency injection.
+Flexerant.MongoMigration is a .NET Standard utility for migrating MongoDB databases and schemas, based on the [MongoDB .NET driver](https://mongodb.github.io/mongo-csharp-driver/). Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked. To revert back to a previous state, simply write a migration that undoes the previous one(s). With this library, migrations occur during startup and support dependency injection.
 
 ## Motivation
 
