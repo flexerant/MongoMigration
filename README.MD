@@ -63,16 +63,25 @@ That's it! Migrations will automatically be executed on start up.
 
 ## Usage
 
-Each migration inherits `Flexerant.MongoMigration.Migration`. The migration number is controlled by the `[Migration]` attribute. Successful migrations result a transaction record saved to the database, whereas failures roll-back the failed migration. Dependency injection is supported so dependencies can be accessed as part of the migration process.
+Each migration inherits `Flexerant.MongoMigration.Migration`. The migration number is controlled by the `[Migration]` attribute. Dependency injection is supported so dependencies can be accessed as part of the migration process.
+
+Two abstract methods must be implemented, `Migrate` and `MigrateAsTransaction`. `Migrate` simply runs the migration without rollback on failure whereas `MigrateAsTransaction` uses [transactions](https://docs.mongodb.com/manual/core/transactions/) to roll back on failure. Both methods are executed so only one needs to be implemented. In most cases `MigrateAsTransaction` is the best choice, especially when debugging, however, some implementations of `IMongoDatabase` do not support transactions and therefore `Migrate` can be used.
 
 ```csharp
 [Migration(1)]
 public class Migration_001 : Migration
 {
-    public override string Description => "Create the students collection.";
+    public override string Description => "Create student";
 
-    public override void Migrate(IMongoDatabase db)
+    public override void Migrate(IMongoDatabase database) { }
+
+    public override void MigrateAsTransaction(IMongoDatabase database, IClientSessionHandle session)
     {
+        database.CreateCollection(session, "Students");
+        var students = database.GetCollection<BsonDocument>("Students");
+
+        session.StartTransaction();
+
         var document = new BsonDocument { { "student_id", 10000 },
             {
                 "scores",
@@ -81,18 +90,16 @@ public class Migration_001 : Migration
                     new BsonDocument { { "type", "quiz" }, { "score", 74.92381029342834 } },
                     new BsonDocument { { "type", "homework" }, { "score", 89.97929384290324 } },
                     new BsonDocument { { "type", "homework" }, { "score", 82.12931030513218 } }
-                }
+                    }
             }, { "class_id", 480 }
         };
 
-        var students = db.GetCollection<BsonDocument>("Students");
-
-        students.InsertOne(document);
+        students.InsertOne(session, document);
     }
 }
 ```
 
-The `Migrate` methods provides access to the `IMongoDatabase` object and therefore any operation supported by `IMongoDatabase` is possible.
+Both methods provides access to the `IMongoDatabase` object and therefore any operation supported by `IMongoDatabase` is possible. The `IClientSessionHandle` object can be used to manage transactions as shown in the example.
 
 ## License
 
