@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -24,15 +25,32 @@ namespace Flexerant.MongoMigration
 
                 if (options != null) options.Invoke(opts);
             });
-
-            services.AddSingleton<IMigrationRunner, MigrationRunner>();
         }
 
         public static void UseMongoMigrations(this IApplicationBuilder app)
         {
-            IMigrationRunner migrationRunner = app.ApplicationServices.GetService<IMigrationRunner>();
+            var sp = app.ApplicationServices;
+            var options = sp.GetService<IOptions<MigrationOptions>>();
+            var logger = sp.GetService<ILogger<MigrationRunner>>();
+            IMongoDatabase db;
 
-            migrationRunner.Run();
+            if (options.Value.MongoDatabase == null)
+            {
+                db = sp.GetService<IMongoDatabase>();
+            }
+            else
+            {
+                db = options.Value.MongoDatabase;
+            }
+
+            if (db == null)
+            {
+                throw new InvalidOperationException($"No {typeof(IMongoDatabase).Name} instance was found. Either add it to the {typeof(IServiceCollection).Name} instance or set the {typeof(MigrationOptions).Name} delegate in {nameof(AddMongoMigrations)}");
+            }
+
+            var migration = new MigrationRunner(sp, options, db, logger);
+
+            migration.Run();
         }
     }
 }
