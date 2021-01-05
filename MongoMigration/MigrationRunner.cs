@@ -17,7 +17,7 @@ namespace Flexerant.MongoMigration
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<MigrationRunner> _logger;
 
-        internal IMongoDatabase Database;
+        public IMongoDatabase Database { get; set; }
 
         public MigrationRunner(IServiceProvider serviceProvider, IOptions<MigrationOptions> options, IMongoDatabase mongoDatabase, ILogger<MigrationRunner> logger)
         {
