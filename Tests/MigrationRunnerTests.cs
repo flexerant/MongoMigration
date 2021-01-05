@@ -9,6 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using System.Linq;
 using Moq;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace Tests
 {
@@ -145,7 +147,12 @@ namespace Tests
 
                 using (var host = builder.Start())
                 {
-                    var migrationRunner = host.Services.GetService<IMigrationRunner>() as MigrationRunner;
+                    var sp = host.Services;
+                    var options = sp.GetService<IOptions<MigrationOptions>>();
+                    var db = sp.GetService<IMongoDatabase>();
+                    var logger = sp.GetService<ILogger<MigrationRunner>>();
+                    var migrationRunner = new MigrationRunner(sp, options, db, logger);
+                    //var migrationRunner = host.Services.GetService<IMigrationRunner>() as MigrationRunner;
 
                     Assert.Equal(iDatabaseMock.Object.GetType(), migrationRunner.Database.GetType());
                     Assert.NotEqual(database.GetType(), migrationRunner.Database.GetType());

@@ -43,6 +43,11 @@ namespace Flexerant.MongoMigration
                 db = options.Value.MongoDatabase;
             }
 
+            if (db == null)
+            {
+                throw new InvalidOperationException($"No {typeof(IMongoDatabase).Name} instance was found. Either add it to the {typeof(IServiceCollection).Name} instance or set the {typeof(MigrationOptions).Name} delegate in {nameof(AddMongoMigrations)}");
+            }
+
             var migration = new MigrationRunner(sp, options, db, logger);
 
             migration.Run();
