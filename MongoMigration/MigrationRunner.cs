@@ -57,7 +57,7 @@ namespace Flexerant.MongoMigration
         {
             var collection = Database.GetCollection<MigratedItem>("Migrations");
             var filter = Builders<MigratedItem>.Filter.Empty;
-            var latestMigration = collection.Find(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
+            var latestMigration = collection.Aggregate().Match(filter).SortByDescending(x => x.MigrationNumber).Limit(1).Project(x => x.MigrationNumber).FirstOrDefault();
             Dictionary<int, Type> migrations = new Dictionary<int, Type>();
 
             foreach (var ass in _migrationOptions.Assemblies)
