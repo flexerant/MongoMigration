@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.1;netcoreapp3.1;net5.0</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
     <AssemblyName>Flexerant.MongoMigration</AssemblyName>
     <RootNamespace>Flexerant.MongoMigration</RootNamespace>
     <PackageProjectUrl>https://github.com/flexerant/MongoMigration</PackageProjectUrl>
@@ -47,8 +47,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
     
-    <PackageReference Include="MongoDB.Driver" Version="2.11.5" />
+    <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
   </ItemGroup>
 
 </Project>

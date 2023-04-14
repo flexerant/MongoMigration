@@ -1,15 +1,10 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Flexerant.MongoMigration
 {
