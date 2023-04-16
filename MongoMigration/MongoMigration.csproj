@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.1;netcoreapp3.1;net5.0</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
     <AssemblyName>Flexerant.MongoMigration</AssemblyName>
     <RootNamespace>Flexerant.MongoMigration</RootNamespace>
     <PackageProjectUrl>https://github.com/flexerant/MongoMigration</PackageProjectUrl>
     <RepositoryUrl>https://github.com/flexerant/MongoMigration</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Flexerant</Authors>
-    <Description>Flexerant.MongoMigration is a .NET Standard utility for migrating MongoDB databases and schemas, based on the MongoDB .NET driver. Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked. To revert back to a previous state, simply write a migration that undoes the previous one(s). With this library, migrations occur during startup and support dependency injection.</Description>
+    <Description>Flexerant.MongoMigration is a .NET utility for migrating MongoDB databases and schemas, based on the MongoDB .NET driver. Unlike other migration implementations, this library only offers forward-only migrations: the rationale being that all database changes should be auditable and forward-only migrations ensure that every change is tracked. To revert back to a previous state, simply write a migration that undoes the previous one(s). With this library, migrations occur during startup and support dependency injection.</Description>
     <PackageIcon></PackageIcon>
   </PropertyGroup>
 
@@ -46,9 +46,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="GitVersion.MsBuild" Version="5.12.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
     
-    <PackageReference Include="MongoDB.Driver" Version="2.11.5" />
+    <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
   </ItemGroup>
 
 </Project>
